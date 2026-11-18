@@ -1,19 +1,9 @@
-"""
-Główny moduł aplikacji.
-Zgodnie z wymaganiem importuje jedynie moduł Product.
-"""
-
-from magazine import Product
-
-
-def main() -> None:
-    print("Moduł main uruchomiony pomyślnie.")
-    print("Zaimportowano moduł Product:", Product)
-
-    # Utworzenie i wyświetlenie obiektu z modułu Product
-    produkt = Product.Product(name="Klawiatura mechaniczna", price=299.99, quantity=10)
-    print(produkt)
-
+import unittest
+from test_all import suite
 
 if __name__ == "__main__":
-    main()
+    print("Uruchamianie wszystkich testów jednostkowych (Zadania 1-7)...\n")
+    runner = unittest.TextTestRunner(verbosity=2)
+    result = runner.run(suite())
+    if not result.wasSuccessful():
+        exit(1)
