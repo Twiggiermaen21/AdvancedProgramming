@@ -1,12 +1,10 @@
-def wyswietl_imiona(imiona):
+def przywitaj(name: str, surname: str) -> str:
     """
-    Funkcja przyjmuje w parametrze listę 5 imion
-    i wyświetla każde z nich w nowej linii.
+    Funkcja przyjmuje imię oraz nazwisko i zwraca sformatowane powitanie.
     """
-    for imie in imiona:
-        print(imie)
+    return f"Cześć {name} {surname}!"
 
 
 if __name__ == "__main__":
-    lista_imion = ["Anna", "Jan", "Katarzyna", "Piotr", "Zofia"]
-    wyswietl_imiona(lista_imion)
+    powitanie: str = przywitaj("Jan", "Kowalski")
+    print(powitanie)

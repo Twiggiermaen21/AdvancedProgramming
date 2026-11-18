@@ -1,16 +1,24 @@
-def wyswietl_parzyste(liczby):
+def czy_parzysta(liczba: int) -> bool:
     """
-    Funkcja przyjmuje w parametrze listę liczb
-    i wyświetla jedynie elementy parzyste.
+    Funkcja sprawdza czy przekazana liczba jest parzysta.
+    Zwraca True jeśli jest parzysta, w przeciwnym razie False.
     """
-    for liczba in liczby:
-        if liczba % 2 == 0:
-            print(liczba)
+    return liczba % 2 == 0
 
 
 if __name__ == "__main__":
-    # Utworzenie listy 10 liczb przy użyciu funkcji range (np. liczby od 1 do 10)
-    lista_liczb = list(range(1, 11))
-    print(f"Lista wejściowa: {lista_liczb}")
-    print("Liczby parzyste:")
-    wyswietl_parzyste(lista_liczb)
+    liczba: int = 8
+    wynik: bool = czy_parzysta(liczba)
+
+    if wynik:
+        print("Liczba parzysta")
+    else:
+        print("Liczba nieparzysta")
+
+    # Dodatkowy test dla liczby nieparzystej
+    liczba_nieparzysta: int = 7
+    wynik_nieparzysta: bool = czy_parzysta(liczba_nieparzysta)
+    if wynik_nieparzysta:
+        print("Liczba parzysta")
+    else:
+        print("Liczba nieparzysta")
