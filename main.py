@@ -1,4 +1,5 @@
-from zad_8 import main
+from zad_4 import BreweryApp
 
 if __name__ == "__main__":
-    main()
+    app = BreweryApp()
+    app.run()
