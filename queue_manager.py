@@ -1,103 +1,61 @@
 """
-Moduł zarządzania kolejką zadań w pliku CSV oraz blokadą wieloprocesową.
+Moduł zarządzania kolejką zadań z wykorzystaniem bazy danych SQLite.
+Zapewnia atomowe transakcje i bezpieczeństwo wieloprocesowe.
 """
 
-from contextlib import contextmanager
-import csv
 from datetime import datetime
 import os
 import random
-import time
+import sqlite3
 from typing import Any, Optional
 
-QUEUE_FILE: str = "queue.csv"
-LOCK_FILE: str = "queue.lock"
-FIELDNAMES: list[str] = [
-    "id",
-    "topic",
-    "client_phone",
-    "status",
-    "worker_id",
-    "created_at",
-    "updated_at",
-]
+DB_FILE: str = "queue.db"
 
 STATUS_PENDING: str = "pending"
 STATUS_IN_PROGRESS: str = "in_progress"
 STATUS_DONE: str = "done"
 
 
-@contextmanager
-def file_lock(lock_path: str = LOCK_FILE, timeout: float = 10.0):
+def get_connection(db_path: str = DB_FILE) -> sqlite3.Connection:
     """
-    Zapewnia atomową blokadę pliku dla wielu procesów (Windows i Linux).
+    Tworzy i konfiguruje połączenie z bazą SQLite.
+    Włącza tryb WAL oraz timeout dla bezpiecznej pracy wieloprocesowej.
     """
-    start_time = time.time()
-    while True:
-        try:
-            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_RDWR)
-            os.close(fd)
-            break
-        except FileExistsError:
-            if time.time() - start_time > timeout:
-                try:
-                    if os.path.exists(lock_path):
-                        age = time.time() - os.path.getmtime(lock_path)
-                        if age > timeout:
-                            os.remove(lock_path)
-                            continue
-                except OSError:
-                    pass
-                raise TimeoutError("Przekroczono czas oczekiwania na blokadę.")
-            time.sleep(0.05)
-    try:
-        yield
-    finally:
-        try:
-            if os.path.exists(lock_path):
-                os.remove(lock_path)
-        except OSError:
-            pass
+    conn = sqlite3.connect(db_path, timeout=15.0)
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA busy_timeout=5000;")
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
-def init_queue_file(file_path: str = QUEUE_FILE) -> None:
+def init_db(db_path: str = DB_FILE) -> None:
     """
-    Inicjalizuje plik kolejki nagłówkiem, jeśli plik jeszcze nie istnieje.
+    Tworzy tabelę tasks oraz indeks po statusie, jeśli nie istnieją.
     """
-    if not os.path.exists(file_path):
-        with open(file_path, mode="w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-            writer.writeheader()
-
-
-def read_all_tasks(file_path: str = QUEUE_FILE) -> list[dict[str, str]]:
-    """
-    Odczytuje wszystkie wiersze z pliku kolejki.
-    """
-    if not os.path.exists(file_path):
-        return []
-    with open(file_path, mode="r", newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        return list(reader)
-
-
-def write_all_tasks(
-    tasks: list[dict[str, str]], file_path: str = QUEUE_FILE
-) -> None:
-    """
-    Zapisuje listę zadań do pliku (zapis atomowy przez plik tymczasowy).
-    """
-    temp_path = f"{file_path}.tmp"
-    with open(temp_path, mode="w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-        writer.writeheader()
-        writer.writerows(tasks)
-    os.replace(temp_path, file_path)
+    with get_connection(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                topic TEXT NOT NULL,
+                client_phone TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(
+                    status IN ('pending', 'in_progress', 'done')
+                ),
+                worker_id TEXT DEFAULT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);"
+        )
 
 
 def generate_phone_number() -> str:
     """
-    Generuje losowy numer telefonu w formacie polskim.
+    Generuje losowy numer telefonu w polskim formacie.
     """
     prefix = random.choice(["501", "502", "503", "601", "602", "701", "888"])
     part1 = random.randint(100, 999)
@@ -107,78 +65,137 @@ def generate_phone_number() -> str:
 
 def add_task(
     topic: str = "Konsultacja telefoniczna",
-    file_path: str = QUEUE_FILE,
-    lock_path: str = LOCK_FILE,
-) -> dict[str, str]:
+    db_path: str = DB_FILE,
+) -> dict[str, Any]:
     """
-    Dodaje 1 zadanie (rozmowę) do kolejki o statusie 'pending'.
+    Dodaje 1 zadanie (rozmowę telefoniczną) o statusie 'pending'.
     """
-    with file_lock(lock_path):
-        init_queue_file(file_path)
-        tasks = read_all_tasks(file_path)
-        next_id = len(tasks) + 1
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    init_db(db_path)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    phone = generate_phone_number()
 
-        new_task = {
-            "id": str(next_id),
-            "topic": topic,
-            "client_phone": generate_phone_number(),
-            "status": STATUS_PENDING,
-            "worker_id": "",
-            "created_at": now_str,
-            "updated_at": now_str,
-        }
-        tasks.append(new_task)
-        write_all_tasks(tasks, file_path)
-        return new_task
+    with get_connection(db_path) as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO tasks (
+                topic, client_phone, status, worker_id, created_at, updated_at
+            )
+            VALUES (?, ?, ?, NULL, ?, ?);
+            """,
+            (topic, phone, STATUS_PENDING, now_str, now_str),
+        )
+        task_id = cursor.lastrowid
+
+    return {
+        "id": task_id,
+        "topic": topic,
+        "client_phone": phone,
+        "status": STATUS_PENDING,
+        "worker_id": None,
+        "created_at": now_str,
+        "updated_at": now_str,
+    }
 
 
 def claim_next_pending_task(
     worker_id: str,
-    file_path: str = QUEUE_FILE,
-    lock_path: str = LOCK_FILE,
-) -> Optional[dict[str, str]]:
+    db_path: str = DB_FILE,
+) -> Optional[dict[str, Any]]:
     """
-    Wyszukuje pierwsze zadanie 'pending', zmienia jego status na 'in_progress',
-    przypisuje identyfikator pracownika i zapisuje plik.
+    Wyszukuje pierwsze zadanie 'pending' i atomowo zmienia status
+    na 'in_progress' oraz przypisuje do konsumenta.
     """
-    with file_lock(lock_path):
-        init_queue_file(file_path)
-        tasks = read_all_tasks(file_path)
+    init_db(db_path)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_connection(db_path)
 
-        for task in tasks:
-            if task.get("status") == STATUS_PENDING:
-                now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                task["status"] = STATUS_IN_PROGRESS
-                task["worker_id"] = worker_id
-                task["updated_at"] = now_str
-                write_all_tasks(tasks, file_path)
-                return task
+    try:
+        conn.execute("BEGIN IMMEDIATE;")
+        cursor = conn.execute(
+            """
+            SELECT id, topic, client_phone, status, created_at
+            FROM tasks
+            WHERE status = ?
+            ORDER BY id ASC
+            LIMIT 1;
+            """,
+            (STATUS_PENDING,),
+        )
+        row = cursor.fetchone()
+
+        if row:
+            task_id = row["id"]
+            conn.execute(
+                """
+                UPDATE tasks
+                SET status = ?, worker_id = ?, updated_at = ?
+                WHERE id = ?;
+                """,
+                (STATUS_IN_PROGRESS, worker_id, now_str, task_id),
+            )
+            conn.commit()
+            return {
+                "id": task_id,
+                "topic": row["topic"],
+                "client_phone": row["client_phone"],
+                "status": STATUS_IN_PROGRESS,
+                "worker_id": worker_id,
+                "created_at": row["created_at"],
+                "updated_at": now_str,
+            }
+
+        conn.commit()
         return None
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def mark_task_done(
-    task_id: str,
+    task_id: int | str,
     worker_id: str,
-    file_path: str = QUEUE_FILE,
-    lock_path: str = LOCK_FILE,
+    db_path: str = DB_FILE,
 ) -> bool:
     """
-    Zmienia status wskazanego zadania na 'done'.
+    Zmienia status zadania na 'done'.
     """
-    with file_lock(lock_path):
-        tasks = read_all_tasks(file_path)
-        found = False
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with get_connection(db_path) as conn:
+        cursor = conn.execute(
+            """
+            UPDATE tasks
+            SET status = ?, worker_id = ?, updated_at = ?
+            WHERE id = ?;
+            """,
+            (STATUS_DONE, worker_id, now_str, int(task_id)),
+        )
+        return cursor.rowcount > 0
 
-        for task in tasks:
-            if task.get("id") == str(task_id):
-                task["status"] = STATUS_DONE
-                task["worker_id"] = worker_id
-                task["updated_at"] = now_str
-                found = True
-                break
 
-        if found:
-            write_all_tasks(tasks, file_path)
-        return found
+def get_queue_stats(db_path: str = DB_FILE) -> dict[str, int]:
+    """
+    Zwraca zliczenia zadań według statusu w bazie danych.
+    """
+    init_db(db_path)
+    with get_connection(db_path) as conn:
+        cursor = conn.execute(
+            """
+            SELECT status, COUNT(*) AS count
+            FROM tasks
+            GROUP BY status;
+            """
+        )
+        rows = cursor.fetchall()
+
+    stats = {
+        STATUS_PENDING: 0,
+        STATUS_IN_PROGRESS: 0,
+        STATUS_DONE: 0,
+    }
+    for row in rows:
+        stats[row["status"]] = row["count"]
+
+    stats["total"] = sum(stats.values())
+    return stats

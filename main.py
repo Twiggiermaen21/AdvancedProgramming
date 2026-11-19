@@ -1,5 +1,5 @@
 """
-Główny moduł demonstracyjny i monitorujący system kolejkowy.
+Główny moduł demonstracyjny i monitorujący system kolejkowy SQLite.
 Umożliwia:
 - sprawdzenie statystyk kolejki (pending, in_progress, done),
 - dodanie 100 zadań za pośrednictwem producera,
@@ -11,42 +11,38 @@ import subprocess
 import sys
 import time
 from queue_manager import (
-    QUEUE_FILE,
+    DB_FILE,
     STATUS_DONE,
     STATUS_IN_PROGRESS,
     STATUS_PENDING,
     add_task,
-    init_queue_file,
-    read_all_tasks,
+    get_queue_stats,
+    init_db,
 )
 
 
 def display_stats() -> None:
     """
-    Wyświetla bieżący stan zadań w pliku kolejki.
+    Wyświetla bieżący stan zadań w bazie SQLite.
     """
-    init_queue_file()
-    tasks = read_all_tasks()
-    total = len(tasks)
-    pending = sum(1 for t in tasks if t.get("status") == STATUS_PENDING)
-    in_prog = sum(1 for t in tasks if t.get("status") == STATUS_IN_PROGRESS)
-    done = sum(1 for t in tasks if t.get("status") == STATUS_DONE)
+    init_db()
+    stats = get_queue_stats()
 
     print("=" * 45)
-    print("           STATUS KOLEJKI ZADAŃ              ")
+    print("         STATUS KOLEJKI ZADAŃ (SQLITE)       ")
     print("=" * 45)
-    print(f" Łączna liczba zadań:   {total}")
-    print(f" Oczekujące (pending):  {pending}")
-    print(f" W toku (in_progress):  {in_prog}")
-    print(f" Ukończone (done):      {done}")
+    print(f" Łączna liczba zadań:   {stats['total']}")
+    print(f" Oczekujące (pending):  {stats[STATUS_PENDING]}")
+    print(f" W toku (in_progress):  {stats[STATUS_IN_PROGRESS]}")
+    print(f" Ukończone (done):      {stats[STATUS_DONE]}")
     print("=" * 45)
 
 
 def populate_queue(count: int = 100) -> None:
     """
-    Dodaje wskazaną liczbę zadań do kolejki.
+    Dodaje wskazaną liczbę zadań do bazy danych.
     """
-    print(f"Dodawanie {count} zadań do pliku {QUEUE_FILE}...")
+    print(f"Dodawanie {count} zadań do bazy {DB_FILE}...")
     for i in range(1, count + 1):
         add_task(topic=f"Rozmowa telefoniczna z klientem #{i}")
     print(f"Pomyślnie dodano {count} zadań o statusie 'pending'.")
@@ -98,7 +94,7 @@ def run_multiple_consumers(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Skrypt pomocniczy do zarządzania kolejką."
+        description="Skrypt pomocniczy do zarządzania kolejką SQLite."
     )
     parser.add_argument(
         "--populate",

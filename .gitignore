@@ -37,6 +37,8 @@ venv.bak/
 # Queue temporary and lock files
 *.lock
 *.tmp
+*.db-wal
+*.db-shm
 
 # IDEs and Editors
 .idea/

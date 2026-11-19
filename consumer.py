@@ -1,6 +1,6 @@
 """
-Moduł consumer.py - pobieranie i wykonywanie zadań z pliku kolejki.
-Działa w nieskończonej pętli (while True), co 5s sprawdza plik.
+Moduł consumer.py - pobieranie i wykonywanie zadań z bazy SQLite.
+Działa w pętli (while True), co 5s sprawdza bazę.
 Po pobraniu zadania zmienia status na 'in_progress',
 wykonuje pracę przez 30s i zmienia status na 'done'.
 """
@@ -10,7 +10,7 @@ import os
 import time
 from queue_manager import (
     claim_next_pending_task,
-    init_queue_file,
+    init_db,
     mark_task_done,
 )
 
@@ -21,7 +21,7 @@ def parse_arguments() -> argparse.Namespace:
     """
     default_id = f"Konsument-{os.getpid()}"
     parser = argparse.ArgumentParser(
-        description="Consumer - wykonywanie zadań z kolejki plikowej."
+        description="Consumer - wykonywanie zadań z bazy SQLite."
     )
     parser.add_argument(
         "--id",
@@ -33,7 +33,7 @@ def parse_arguments() -> argparse.Namespace:
         "--duration",
         type=float,
         default=30.0,
-        help="Czas trwania wykonywania zadania w sekundach (domyślnie 30s).",
+        help="Czas trwania zadania w sekundach (domyślnie 30s).",
     )
     parser.add_argument(
         "--interval",
@@ -58,10 +58,10 @@ def run_consumer(
     """
     Główna pętla konsumenta.
     """
-    init_queue_file()
+    init_db()
     print(
-        f"[{worker_id}] Konsument uruchomiony. "
-        f"Czas pracy: {duration}s, interwał sprawdzania: {interval}s."
+        f"[{worker_id}] Konsument uruchomiony (SQLite). "
+        f"Czas pracy: {duration}s, interwał: {interval}s."
     )
 
     try:
