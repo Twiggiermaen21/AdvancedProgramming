@@ -1,102 +1,108 @@
 """
-Aplikacja FastAPI udostępniająca endpointy z danymi filmowymi.
+Aplikacja FastAPI udostępniająca endpointy z danymi filmowymi z bazy SQLite.
 """
 
-import csv
-import os
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Any, Optional
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
+from sqlalchemy.orm import Session
+from database import SessionLocal, get_db
+from load_data import load_all_data
 from models import Link, Movie, Rating, Tag
 
-app = FastAPI(title="Movie API")
 
-DATA_DIR: str = os.path.join(os.path.dirname(__file__), "data")
-
-
-def load_movies(file_path: Optional[str] = None) -> list[dict[str, Any]]:
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
-    Wczytuje filmy z pliku movies.csv, tworzy obiekty Movie
-    i serializuje je przy użyciu metody magicznej __dict__.
+    Kontekst cyklu życia aplikacji: upewnia się, że tabele istnieją
+    i ładuje dane początkowe z plików CSV, jeśli baza jest pusta.
     """
-    path = file_path or os.path.join(DATA_DIR, "movies.csv")
-    movies_list: list[dict[str, Any]] = []
-
-    with open(path, mode="r", encoding="utf-8") as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            movie = Movie(
-                movie_id=int(row["movieId"]),
-                title=row["title"],
-                genres=row["genres"],
-            )
-            movies_list.append(movie.__dict__)
-
-    return movies_list
+    load_all_data()
+    yield
 
 
-def load_links(file_path: Optional[str] = None) -> list[dict[str, Any]]:
+app = FastAPI(title="Movie API with SQLite", lifespan=lifespan)
+
+
+def load_movies(
+    db: Optional[Session] = None, limit: Optional[int] = None
+) -> list[dict[str, Any]]:
     """
-    Wczytuje odnośniki z pliku links.csv, tworzy obiekty Link
-    i serializuje je przy użyciu metody magicznej __dict__.
+    Pobiera filmy z bazy SQLite przy użyciu SQLAlchemy
+    i serializuje je do postaci słowników.
     """
-    path = file_path or os.path.join(DATA_DIR, "links.csv")
-    links_list: list[dict[str, Any]] = []
+    if db is not None:
+        query = db.query(Movie)
+        if limit is not None:
+            query = query.limit(limit)
+        return [movie.to_dict() for movie in query.all()]
 
-    with open(path, mode="r", encoding="utf-8") as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            link = Link(
-                movie_id=int(row["movieId"]),
-                imdb_id=row["imdbId"],
-                tmdb_id=row["tmdbId"],
-            )
-            links_list.append(link.__dict__)
-
-    return links_list
+    with SessionLocal() as session:
+        query = session.query(Movie)
+        if limit is not None:
+            query = query.limit(limit)
+        return [movie.to_dict() for movie in query.all()]
 
 
-def load_ratings(file_path: Optional[str] = None) -> list[dict[str, Any]]:
+def load_links(
+    db: Optional[Session] = None, limit: Optional[int] = None
+) -> list[dict[str, Any]]:
     """
-    Wczytuje oceny z pliku ratings.csv, tworzy obiekty Rating
-    i serializuje je przy użyciu metody magicznej __dict__.
+    Pobiera odnośniki z bazy SQLite przy użyciu SQLAlchemy
+    i serializuje je do postaci słowników.
     """
-    path = file_path or os.path.join(DATA_DIR, "ratings.csv")
-    ratings_list: list[dict[str, Any]] = []
+    if db is not None:
+        query = db.query(Link)
+        if limit is not None:
+            query = query.limit(limit)
+        return [link.to_dict() for link in query.all()]
 
-    with open(path, mode="r", encoding="utf-8") as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            rating = Rating(
-                user_id=int(row["userId"]),
-                movie_id=int(row["movieId"]),
-                rating=float(row["rating"]),
-                timestamp=int(row["timestamp"]),
-            )
-            ratings_list.append(rating.__dict__)
-
-    return ratings_list
+    with SessionLocal() as session:
+        query = session.query(Link)
+        if limit is not None:
+            query = query.limit(limit)
+        return [link.to_dict() for link in query.all()]
 
 
-def load_tags(file_path: Optional[str] = None) -> list[dict[str, Any]]:
+def load_ratings(
+    db: Optional[Session] = None, limit: Optional[int] = None
+) -> list[dict[str, Any]]:
     """
-    Wczytuje tagi z pliku tags.csv, tworzy obiekty Tag
-    i serializuje je przy użyciu metody magicznej __dict__.
+    Pobiera oceny z bazy SQLite przy użyciu SQLAlchemy
+    i serializuje je do postaci słowników.
     """
-    path = file_path or os.path.join(DATA_DIR, "tags.csv")
-    tags_list: list[dict[str, Any]] = []
+    if db is not None:
+        query = db.query(Rating)
+        if limit is not None:
+            query = query.limit(limit)
+        return [rating.to_dict() for rating in query.all()]
 
-    with open(path, mode="r", encoding="utf-8") as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            tag = Tag(
-                user_id=int(row["userId"]),
-                movie_id=int(row["movieId"]),
-                tag=row["tag"],
-                timestamp=int(row["timestamp"]),
-            )
-            tags_list.append(tag.__dict__)
+    with SessionLocal() as session:
+        query = session.query(Rating)
+        if limit is not None:
+            query = query.limit(limit)
+        return [rating.to_dict() for rating in query.all()]
 
-    return tags_list
+
+def load_tags(
+    db: Optional[Session] = None, limit: Optional[int] = None
+) -> list[dict[str, Any]]:
+    """
+    Pobiera tagi z bazy SQLite przy użyciu SQLAlchemy
+    i serializuje je do postaci słowników.
+    """
+    if db is not None:
+        query = db.query(Tag)
+        if limit is not None:
+            query = query.limit(limit)
+        return [tag.to_dict() for tag in query.all()]
+
+    with SessionLocal() as session:
+        query = session.query(Tag)
+        if limit is not None:
+            query = query.limit(limit)
+        return [tag.to_dict() for tag in query.all()]
 
 
 @app.get("/")
@@ -116,51 +122,51 @@ def read_hello() -> dict[str, str]:
 
 
 @app.get("/movies")
-def read_movies(limit: Optional[int] = None) -> list[dict[str, Any]]:
+def read_movies(
+    limit: Optional[int] = None,
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
     """
-    Endpoint zwracający listę filmów zserializowanych przez __dict__.
+    Endpoint zwracający listę filmów pobranych z bazy SQLite.
     Opcjonalny parametr 'limit' pozwala ograniczyć liczbę wyników.
     """
-    movies = load_movies()
-    if limit is not None:
-        return movies[:limit]
-    return movies
+    return load_movies(db=db, limit=limit)
 
 
 @app.get("/links")
-def read_links(limit: Optional[int] = None) -> list[dict[str, Any]]:
+def read_links(
+    limit: Optional[int] = None,
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
     """
-    Endpoint zwracający listę odnośników zserializowanych przez __dict__.
+    Endpoint zwracający listę odnośników pobranych z bazy SQLite.
     Opcjonalny parametr 'limit' pozwala ograniczyć liczbę wyników.
     """
-    links = load_links()
-    if limit is not None:
-        return links[:limit]
-    return links
+    return load_links(db=db, limit=limit)
 
 
 @app.get("/ratings")
-def read_ratings(limit: Optional[int] = None) -> list[dict[str, Any]]:
+def read_ratings(
+    limit: Optional[int] = None,
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
     """
-    Endpoint zwracający listę ocen zserializowanych przez __dict__.
+    Endpoint zwracający listę ocen pobranych z bazy SQLite.
     Opcjonalny parametr 'limit' pozwala ograniczyć liczbę wyników.
     """
-    ratings = load_ratings()
-    if limit is not None:
-        return ratings[:limit]
-    return ratings
+    return load_ratings(db=db, limit=limit)
 
 
 @app.get("/tags")
-def read_tags(limit: Optional[int] = None) -> list[dict[str, Any]]:
+def read_tags(
+    limit: Optional[int] = None,
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
     """
-    Endpoint zwracający listę tagów zserializowanych przez __dict__.
+    Endpoint zwracający listę tagów pobranych z bazy SQLite.
     Opcjonalny parametr 'limit' pozwala ograniczyć liczbę wyników.
     """
-    tags = load_tags()
-    if limit is not None:
-        return tags[:limit]
-    return tags
+    return load_tags(db=db, limit=limit)
 
 
 if __name__ == "__main__":
