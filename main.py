@@ -1,7 +1,7 @@
 """
-Główny moduł demonstracyjny i monitorujący system kolejkowy SQLite.
+Główny moduł demonstracyjny i monitorujący system kolejkowy RabbitMQ.
 Umożliwia:
-- sprawdzenie statystyk kolejki (pending, in_progress, done),
+- sprawdzenie statystyk kolejki w RabbitMQ (liczba wiadomości i konsumentów),
 - dodanie 100 zadań za pośrednictwem producera,
 - uruchomienie wielu konsumentów w osobnych procesach.
 """
@@ -11,41 +11,41 @@ import subprocess
 import sys
 import time
 from queue_manager import (
-    DB_FILE,
-    STATUS_DONE,
-    STATUS_IN_PROGRESS,
-    STATUS_PENDING,
-    add_task,
+    QUEUE_NAME,
+    RABBITMQ_HOST,
+    RABBITMQ_PORT,
     get_queue_stats,
-    init_db,
+    send_task,
 )
 
 
 def display_stats() -> None:
     """
-    Wyświetla bieżący stan zadań w bazie SQLite.
+    Wyświetla bieżący stan zadań w kolejce RabbitMQ.
     """
-    init_db()
-    stats = get_queue_stats()
-
-    print("=" * 45)
-    print("         STATUS KOLEJKI ZADAŃ (SQLITE)       ")
-    print("=" * 45)
-    print(f" Łączna liczba zadań:   {stats['total']}")
-    print(f" Oczekujące (pending):  {stats[STATUS_PENDING]}")
-    print(f" W toku (in_progress):  {stats[STATUS_IN_PROGRESS]}")
-    print(f" Ukończone (done):      {stats[STATUS_DONE]}")
-    print("=" * 45)
+    try:
+        stats = get_queue_stats()
+        print("=" * 45)
+        print("        STATUS KOLEJKI ZADAŃ (RABBITMQ)      ")
+        print("=" * 45)
+        print(f" Nazwa kolejki:         {QUEUE_NAME}")
+        print(f" Broker AMQP:           {RABBITMQ_HOST}:{RABBITMQ_PORT}")
+        print(f" Oczekujące wiadomości: {stats['message_count']}")
+        print(f" Aktywni konsumenci:    {stats['consumer_count']}")
+        print(f" Panel Management UI:   http://localhost:8080")
+        print("=" * 45)
+    except Exception as error:
+        print(f"Błąd połączenia z RabbitMQ: {error}")
 
 
 def populate_queue(count: int = 100) -> None:
     """
-    Dodaje wskazaną liczbę zadań do bazy danych.
+    Dodaje wskazaną liczbę zadań do kolejki RabbitMQ.
     """
-    print(f"Dodawanie {count} zadań do bazy {DB_FILE}...")
+    print(f"Dodawanie {count} zadań do kolejki '{QUEUE_NAME}' w RabbitMQ...")
     for i in range(1, count + 1):
-        add_task(topic=f"Rozmowa telefoniczna z klientem #{i}")
-    print(f"Pomyślnie dodano {count} zadań o statusie 'pending'.")
+        send_task(topic=f"Rozmowa telefoniczna z klientem #{i}", task_id=i)
+    print(f"Pomyślnie wysłano {count} zadań o statusie 'pending'.")
 
 
 def run_multiple_consumers(
@@ -94,7 +94,7 @@ def run_multiple_consumers(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Skrypt pomocniczy do zarządzania kolejką SQLite."
+        description="Skrypt pomocniczy do zarządzania kolejką RabbitMQ."
     )
     parser.add_argument(
         "--populate",
@@ -105,7 +105,7 @@ def main() -> None:
     parser.add_argument(
         "--stats",
         action="store_true",
-        help="Wyświetla bieżące statystyki kolejki.",
+        help="Wyświetla bieżące statystyki kolejki w RabbitMQ.",
     )
     parser.add_argument(
         "--start-consumers",

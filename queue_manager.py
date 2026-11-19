@@ -1,56 +1,49 @@
 """
-Moduł zarządzania kolejką zadań z wykorzystaniem bazy danych SQLite.
-Zapewnia atomowe transakcje i bezpieczeństwo wieloprocesowe.
+Moduł zarządzania kolejką zadań w RabbitMQ.
+Udostępnia funkcje pomocnicze dla producenta oraz konsumenta.
 """
 
 from datetime import datetime
-import os
+import json
 import random
-import sqlite3
+import time
 from typing import Any, Optional
+import pika
 
-DB_FILE: str = "queue.db"
+RABBITMQ_HOST: str = "localhost"
+RABBITMQ_PORT: int = 8081
+QUEUE_NAME: str = "calls_queue"
 
 STATUS_PENDING: str = "pending"
 STATUS_IN_PROGRESS: str = "in_progress"
 STATUS_DONE: str = "done"
 
 
-def get_connection(db_path: str = DB_FILE) -> sqlite3.Connection:
+def get_connection(
+    host: str = RABBITMQ_HOST,
+    port: int = RABBITMQ_PORT,
+    heartbeat: int = 0,
+) -> pika.BlockingConnection:
     """
-    Tworzy i konfiguruje połączenie z bazą SQLite.
-    Włącza tryb WAL oraz timeout dla bezpiecznej pracy wieloprocesowej.
+    Tworzy połączenie z serwerem RabbitMQ z wyłączonym lub wydłużonym
+    heartbeatem, aby zapobiec rozłączeniu podczas długich zadań (30s).
     """
-    conn = sqlite3.connect(db_path, timeout=15.0)
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA busy_timeout=5000;")
-    conn.row_factory = sqlite3.Row
-    return conn
+    params = pika.ConnectionParameters(
+        host=host,
+        port=port,
+        heartbeat=heartbeat,
+    )
+    return pika.BlockingConnection(params)
 
 
-def init_db(db_path: str = DB_FILE) -> None:
+def setup_queue(
+    channel: pika.adapters.blocking_connection.BlockingChannel,
+    queue_name: str = QUEUE_NAME,
+) -> Any:
     """
-    Tworzy tabelę tasks oraz indeks po statusie, jeśli nie istnieją.
+    Deklaruje trwałą (durable) kolejkę zadań w RabbitMQ.
     """
-    with get_connection(db_path) as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS tasks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                topic TEXT NOT NULL,
-                client_phone TEXT NOT NULL,
-                status TEXT NOT NULL CHECK(
-                    status IN ('pending', 'in_progress', 'done')
-                ),
-                worker_id TEXT DEFAULT NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-            """
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);"
-        )
+    return channel.queue_declare(queue=queue_name, durable=True)
 
 
 def generate_phone_number() -> str:
@@ -63,139 +56,63 @@ def generate_phone_number() -> str:
     return f"+48 {prefix} {part1} {part2}"
 
 
-def add_task(
+def send_task(
     topic: str = "Konsultacja telefoniczna",
-    db_path: str = DB_FILE,
+    task_id: Optional[int] = None,
+    host: str = RABBITMQ_HOST,
+    port: int = RABBITMQ_PORT,
+    queue_name: str = QUEUE_NAME,
 ) -> dict[str, Any]:
     """
-    Dodaje 1 zadanie (rozmowę telefoniczną) o statusie 'pending'.
+    Wysyła jedno zadanie (rozmowę) do kolejki RabbitMQ ze statusem 'pending'.
     """
-    init_db(db_path)
+    connection = get_connection(host=host, port=port)
+    channel = connection.channel()
+    setup_queue(channel, queue_name)
+
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    phone = generate_phone_number()
+    tid = task_id or int(time.time() * 1000) % 1000000
 
-    with get_connection(db_path) as conn:
-        cursor = conn.execute(
-            """
-            INSERT INTO tasks (
-                topic, client_phone, status, worker_id, created_at, updated_at
-            )
-            VALUES (?, ?, ?, NULL, ?, ?);
-            """,
-            (topic, phone, STATUS_PENDING, now_str, now_str),
-        )
-        task_id = cursor.lastrowid
-
-    return {
-        "id": task_id,
+    task_payload = {
+        "id": tid,
         "topic": topic,
-        "client_phone": phone,
+        "client_phone": generate_phone_number(),
         "status": STATUS_PENDING,
         "worker_id": None,
         "created_at": now_str,
-        "updated_at": now_str,
     }
 
+    body = json.dumps(task_payload)
+    channel.basic_publish(
+        exchange="",
+        routing_key=queue_name,
+        body=body,
+        properties=pika.BasicProperties(
+            delivery_mode=pika.DeliveryMode.Persistent
+        ),
+    )
+    connection.close()
+    return task_payload
 
-def claim_next_pending_task(
-    worker_id: str,
-    db_path: str = DB_FILE,
-) -> Optional[dict[str, Any]]:
+
+def get_queue_stats(
+    host: str = RABBITMQ_HOST,
+    port: int = RABBITMQ_PORT,
+    queue_name: str = QUEUE_NAME,
+) -> dict[str, int]:
     """
-    Wyszukuje pierwsze zadanie 'pending' i atomowo zmienia status
-    na 'in_progress' oraz przypisuje do konsumenta.
+    Pobiera liczbę oczekujących wiadomości oraz aktywnych konsumentów.
     """
-    init_db(db_path)
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    conn = get_connection(db_path)
+    connection = get_connection(host=host, port=port)
+    channel = connection.channel()
+    declare_ok = channel.queue_declare(
+        queue=queue_name, durable=True, passive=False
+    )
+    msg_count = declare_ok.method.message_count
+    consumer_count = declare_ok.method.consumer_count
+    connection.close()
 
-    try:
-        conn.execute("BEGIN IMMEDIATE;")
-        cursor = conn.execute(
-            """
-            SELECT id, topic, client_phone, status, created_at
-            FROM tasks
-            WHERE status = ?
-            ORDER BY id ASC
-            LIMIT 1;
-            """,
-            (STATUS_PENDING,),
-        )
-        row = cursor.fetchone()
-
-        if row:
-            task_id = row["id"]
-            conn.execute(
-                """
-                UPDATE tasks
-                SET status = ?, worker_id = ?, updated_at = ?
-                WHERE id = ?;
-                """,
-                (STATUS_IN_PROGRESS, worker_id, now_str, task_id),
-            )
-            conn.commit()
-            return {
-                "id": task_id,
-                "topic": row["topic"],
-                "client_phone": row["client_phone"],
-                "status": STATUS_IN_PROGRESS,
-                "worker_id": worker_id,
-                "created_at": row["created_at"],
-                "updated_at": now_str,
-            }
-
-        conn.commit()
-        return None
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
-
-
-def mark_task_done(
-    task_id: int | str,
-    worker_id: str,
-    db_path: str = DB_FILE,
-) -> bool:
-    """
-    Zmienia status zadania na 'done'.
-    """
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with get_connection(db_path) as conn:
-        cursor = conn.execute(
-            """
-            UPDATE tasks
-            SET status = ?, worker_id = ?, updated_at = ?
-            WHERE id = ?;
-            """,
-            (STATUS_DONE, worker_id, now_str, int(task_id)),
-        )
-        return cursor.rowcount > 0
-
-
-def get_queue_stats(db_path: str = DB_FILE) -> dict[str, int]:
-    """
-    Zwraca zliczenia zadań według statusu w bazie danych.
-    """
-    init_db(db_path)
-    with get_connection(db_path) as conn:
-        cursor = conn.execute(
-            """
-            SELECT status, COUNT(*) AS count
-            FROM tasks
-            GROUP BY status;
-            """
-        )
-        rows = cursor.fetchall()
-
-    stats = {
-        STATUS_PENDING: 0,
-        STATUS_IN_PROGRESS: 0,
-        STATUS_DONE: 0,
+    return {
+        "message_count": msg_count,
+        "consumer_count": consumer_count,
     }
-    for row in rows:
-        stats[row["status"]] = row["count"]
-
-    stats["total"] = sum(stats.values())
-    return stats
