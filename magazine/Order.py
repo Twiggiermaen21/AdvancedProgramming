@@ -23,7 +23,10 @@ class Order:
 
     def __str__(self) -> str:
         sformatowana_kwota = utils.formatuj_cene(self.total_amount)
-        return f"Zamówienie nr {self.order_id}, Łączna kwota: {sformatowana_kwota}"
+        return (
+            f"Zamówienie nr {self.order_id}, "
+            f"Łączna kwota: {sformatowana_kwota}"
+        )
 
 
 if __name__ == "__main__":

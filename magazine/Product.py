@@ -24,7 +24,11 @@ class Product:
 
     def __str__(self) -> str:
         sformatowana_cena = utils.formatuj_cene(self.price)
-        return f"Produkt: {self.name}, Cena: {sformatowana_cena}, Ilość: {self.quantity}"
+        return (
+            f"Produkt: {self.name}, "
+            f"Cena: {sformatowana_cena}, "
+            f"Ilość: {self.quantity}"
+        )
 
 
 if __name__ == "__main__":

@@ -11,7 +11,9 @@ def main() -> None:
     print("Zaimportowano moduł Product:", Product)
 
     # Utworzenie i wyświetlenie obiektu z modułu Product
-    produkt = Product.Product(name="Klawiatura mechaniczna", price=299.99, quantity=10)
+    produkt = Product.Product(
+        name="Klawiatura mechaniczna", price=299.99, quantity=10
+    )
     print(produkt)
 
 
