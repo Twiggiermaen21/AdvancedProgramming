@@ -3,7 +3,9 @@ class Property:
     Klasa bazowa opisująca nieruchomość.
     """
 
-    def __init__(self, area: float, rooms: int, price: float, address: str) -> None:
+    def __init__(
+        self, area: float, rooms: int, price: float, address: str
+    ) -> None:
         self.area: float = area
         self.rooms: int = rooms
         self.price: float = price

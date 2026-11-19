@@ -9,7 +9,7 @@ class Student:
 
     def is_passed(self) -> bool:
         """
-        Zwraca True, gdy średnia ocen jest większa niż 50, w przeciwnym razie False.
+        Zwraca True, gdy średnia ocen > 50, w przeciwnym razie False.
         """
         if not self.marks:
             return False
@@ -19,7 +19,10 @@ class Student:
     def __str__(self) -> str:
         srednia = sum(self.marks) / len(self.marks) if self.marks else 0.0
         status = "ZALICZONY" if self.is_passed() else "NIEZALICZONY"
-        return f"Student: {self.name}, Oceny: {self.marks}, Średnia: {srednia:.2f} -> {status}"
+        return (
+            f"Student: {self.name}, Oceny: {self.marks}, "
+            f"Średnia: {srednia:.2f} -> {status}"
+        )
 
 
 if __name__ == "__main__":
@@ -31,7 +34,10 @@ if __name__ == "__main__":
 
     print("--- Test is_passed() ---")
     print(f"{student_zdajacy.name} zaliczył: {student_zdajacy.is_passed()}")
-    print(f"{student_niezdajacy.name} zaliczył: {student_niezdajacy.is_passed()}")
+    print(
+        f"{student_niezdajacy.name} zaliczył: "
+        f"{student_niezdajacy.is_passed()}"
+    )
 
     print("\n--- Informacje o studentach ---")
     print(student_zdajacy)

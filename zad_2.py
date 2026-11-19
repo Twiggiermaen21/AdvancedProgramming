@@ -1,4 +1,3 @@
-from typing import Optional
 from zad_1 import Student
 
 
@@ -25,7 +24,8 @@ class Library:
 
     def __str__(self) -> str:
         return (
-            f"Biblioteka '{self.name}' ({self.street}, {self.zip_code} {self.city}, "
+            f"Biblioteka '{self.name}' ({self.street}, "
+            f"{self.zip_code} {self.city}, "
             f"Godziny otwarcia: {self.open_hours}, Tel: {self.phone})"
         )
 
@@ -59,7 +59,8 @@ class Employee:
         return (
             f"Pracownik: {self.first_name} {self.last_name} "
             f"(Zatrudniony: {self.hire_date}, Data ur.: {self.birth_date}, "
-            f"Adres: {self.street}, {self.zip_code} {self.city}, Tel: {self.phone})"
+            f"Adres: {self.street}, {self.zip_code} {self.city}, "
+            f"Tel: {self.phone})"
         )
 
 
@@ -86,8 +87,10 @@ class Book:
 
     def __str__(self) -> str:
         return (
-            f"Książka: \"{self.title}\" autorstwa {self.author_name} {self.author_surname} "
-            f"(Wydano: {self.publication_date}, Stron: {self.number_of_pages})\n"
+            f"Książka: \"{self.title}\" autorstwa "
+            f"{self.author_name} {self.author_surname} "
+            f"(Wydano: {self.publication_date}, "
+            f"Stron: {self.number_of_pages})\n"
             f"      Lokalizacja: {self.library}"
         )
 
@@ -112,11 +115,11 @@ class Order:
     def __str__(self) -> str:
         ksiazki_str = "\n".join(f"    - {ksiazka}" for ksiazka in self.books)
         return (
-            f"================ ZAMÓWIENIE (Data: {self.order_date}) ================\n"
+            f"========== ZAMÓWIENIE (Data: {self.order_date}) ==========\n"
             f"Obsługujący pracownik:\n  {self.employee}\n"
             f"Zamawiający student:\n  {self.student}\n"
             f"Zamówione książki ({len(self.books)}):\n{ksiazki_str}\n"
-            f"=================================================================="
+            f"==========================================================="
         )
 
 

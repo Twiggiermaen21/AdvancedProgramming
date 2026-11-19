@@ -74,7 +74,8 @@ class Brewery:
             f"Browar: {self.name} (ID: {self.id})\n"
             f"  Typ: {self.brewery_type or 'brak'}\n"
             f"  Adres: {self.street or self.address_1 or 'brak'}\n"
-            f"  Miasto: {self.city or 'brak'}, Kraj: {self.country or 'brak'}\n"
+            f"  Miasto: {self.city or 'brak'}, "
+            f"Kraj: {self.country or 'brak'}\n"
             f"  Telefon: {self.phone or 'brak'}\n"
             f"  Strona WWW: {self.website_url or 'brak'}"
         )
@@ -82,13 +83,17 @@ class Brewery:
 
 class BreweryApiClient:
     """
-    Klasa klienta API odpowiedzialna za komunikację sieciową z Open Brewery DB.
+    Klasa klienta API odpowiedzialna za komunikację z Open Brewery DB.
     """
 
-    def __init__(self, base_url: str = "https://api.openbrewerydb.org/v1/breweries") -> None:
+    def __init__(
+        self, base_url: str = "https://api.openbrewerydb.org/v1/breweries"
+    ) -> None:
         self.base_url: str = base_url
 
-    def get_breweries(self, city: Optional[str] = None, limit: int = 20) -> list[Brewery]:
+    def get_breweries(
+        self, city: Optional[str] = None, limit: int = 20
+    ) -> list[Brewery]:
         """
         Wysyła żądanie do API i zwraca listę instancji klasy Brewery.
         """
@@ -114,16 +119,16 @@ class BreweryApp:
 
     def parse_arguments(self) -> argparse.Namespace:
         """
-        Definiuje i parsuje parametry wiersza poleceń z użyciem modułu argparse.
+        Definiuje i parsuje parametry wiersza poleceń za pomocą argparse.
         """
         parser = argparse.ArgumentParser(
-            description="Obiektowa aplikacja do pobierania browarów z Open Brewery DB."
+            description="Pobieranie browarów z Open Brewery DB."
         )
         parser.add_argument(
             "--city",
             type=str,
             default=None,
-            help="Opcjonalna nazwa miasta do filtrowania browarów (np. --city=Berlin)",
+            help="Opcjonalna nazwa miasta do filtrowania (np. --city=Berlin)",
         )
         return parser.parse_args()
 
