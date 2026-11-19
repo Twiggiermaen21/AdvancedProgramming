@@ -1,1 +1,0 @@
-# Pakiet z testami jednostkowymi
