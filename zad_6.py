@@ -1,4 +1,6 @@
-def polacz_unikalne_do_szescianu(lista1: list[int], lista2: list[int]) -> list[int]:
+def polacz_unikalne_do_szescianu(
+    lista1: list[int], lista2: list[int]
+) -> list[int]:
     """
     Łączy dwie listy w jedną, usuwa duplikaty,
     podnosi każdy element do 3. potęgi i zwraca wynikową listę.

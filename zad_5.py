@@ -13,5 +13,11 @@ if __name__ == "__main__":
     szukana_1: int = 30
     szukana_2: int = 99
 
-    print(f"Czy {szukana_1} znajduje się w {liczby}? {czy_zawiera(liczby, szukana_1)}")
-    print(f"Czy {szukana_2} znajduje się w {liczby}? {czy_zawiera(liczby, szukana_2)}")
+    print(
+        f"Czy {szukana_1} znajduje się w {liczby}? "
+        f"{czy_zawiera(liczby, szukana_1)}"
+    )
+    print(
+        f"Czy {szukana_2} znajduje się w {liczby}? "
+        f"{czy_zawiera(liczby, szukana_2)}"
+    )

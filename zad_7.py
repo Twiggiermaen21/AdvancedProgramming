@@ -62,7 +62,8 @@ class Brewery:
             f"Browar: {self.name} (ID: {self.id})\n"
             f"  Typ: {self.brewery_type or 'brak'}\n"
             f"  Adres: {self.street or self.address_1 or 'brak'}\n"
-            f"  Miasto: {self.city or 'brak'}, Kraj: {self.country or 'brak'}\n"
+            f"  Miasto: {self.city or 'brak'}, "
+            f"Kraj: {self.country or 'brak'}\n"
             f"  Telefon: {self.phone or 'brak'}\n"
             f"  Strona WWW: {self.website_url or 'brak'}"
         )
@@ -70,7 +71,7 @@ class Brewery:
 
 def pobierz_browary(limit: int = 20) -> list[Brewery]:
     """
-    Pobiera listę browarów z API Open Brewery DB i zwraca listę obiektów Brewery.
+    Pobiera listę browarów z API Open Brewery DB i zwraca obiekty Brewery.
     """
     url = "https://api.openbrewerydb.org/v1/breweries"
     response = requests.get(url, params={"per_page": limit})

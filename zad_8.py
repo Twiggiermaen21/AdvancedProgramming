@@ -63,15 +63,18 @@ class Brewery:
             f"Browar: {self.name} (ID: {self.id})\n"
             f"  Typ: {self.brewery_type or 'brak'}\n"
             f"  Adres: {self.street or self.address_1 or 'brak'}\n"
-            f"  Miasto: {self.city or 'brak'}, Kraj: {self.country or 'brak'}\n"
+            f"  Miasto: {self.city or 'brak'}, "
+            f"Kraj: {self.country or 'brak'}\n"
             f"  Telefon: {self.phone or 'brak'}\n"
             f"  Strona WWW: {self.website_url or 'brak'}"
         )
 
 
-def pobierz_browary(city: Optional[str] = None, limit: int = 20) -> list[Brewery]:
+def pobierz_browary(
+    city: Optional[str] = None, limit: int = 20
+) -> list[Brewery]:
     """
-    Pobiera listę browarów z API Open Brewery DB z opcjonalnym filtrowaniem po mieście.
+    Pobiera browary z API Open Brewery DB z opcjonalnym filtrem po mieście.
     """
     url = "https://api.openbrewerydb.org/v1/breweries"
     params: dict[str, Any] = {"per_page": limit}
@@ -95,7 +98,7 @@ def main() -> None:
         "--city",
         type=str,
         default=None,
-        help="Miasto, według którego ograniczone mają zostać pobrane browary",
+        help="Miasto, według którego ograniczone mają zostać browary",
     )
     args = parser.parse_args()
 
