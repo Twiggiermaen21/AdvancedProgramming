@@ -5,7 +5,9 @@ def calculate_discount(price: float | int, discount: float | int) -> float:
     Dla wartości discount < 0 lub discount > 1 rzuca wyjątek ValueError.
     """
     if discount < 0 or discount > 1:
-        raise ValueError("Rabat musi mieścić się w przedziale od 0.0 do 1.0 (od 0% do 100%)")
+        raise ValueError(
+            "Rabat musi mieścić się w przedziale od 0.0 do 1.0 (od 0% do 100%)"
+        )
     if price < 0:
         raise ValueError("Cena nie może być ujemna")
 
